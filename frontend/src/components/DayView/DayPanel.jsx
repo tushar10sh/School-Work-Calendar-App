@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { X, BookOpen, Home, ShoppingBag, CheckCircle, Circle, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
-import { plannerApi, eventsApi, testAlertsApi } from '../../api'
+import { plannerApi, eventsApi, testAlertsApi, configApi } from '../../api'
 
 function EntryItem({ entry, onToggle, onDelete }) {
   return (
@@ -47,6 +47,12 @@ export default function DayPanel({ date, onClose }) {
     queryKey: ['events-day', date],
     queryFn: () => eventsApi.list({ event_date: date }),
     enabled: !!date,
+  })
+
+  const { data: config } = useQuery({
+    queryKey: ['config'],
+    queryFn: () => configApi.get(),
+    staleTime: Infinity,
   })
 
   const { data: tests = [] } = useQuery({
@@ -158,14 +164,21 @@ export default function DayPanel({ date, onClose }) {
                 My Bag
               </h3>
               <div className="flex flex-wrap gap-1.5">
-                {data.bag_items.map((bag) => (
-                  <span
-                    key={bag.id}
-                    className="bg-purple-50 text-purple-700 text-xs font-medium px-2 py-1 rounded-full border border-purple-100"
-                  >
-                    {bag.item}
-                  </span>
-                ))}
+                {data.bag_items.map((bag) => {
+                  const ciMappings = Object.fromEntries(
+                    Object.entries(config?.subject_mappings || {}).map(([k, v]) => [k.toUpperCase(), v])
+                  )
+                  const fullName = ciMappings[bag.item.trim().toUpperCase()]
+                  return (
+                    <span
+                      key={bag.id}
+                      className="bg-purple-50 text-purple-700 text-xs font-medium px-2 py-1 rounded-full border border-purple-100"
+                    >
+                      <span className="font-mono">{bag.item}</span>
+                      {fullName && <span className="font-normal"> — {fullName}</span>}
+                    </span>
+                  )
+                })}
               </div>
             </section>
           )}

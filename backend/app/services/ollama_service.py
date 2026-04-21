@@ -79,6 +79,14 @@ async def parse_whatsapp_message(message: str) -> ParsedOllamaResult:
                 if not (2020 <= result.date.year <= 2035):
                     raise ValueError(f"Parsed year {result.date.year} looks wrong")
 
+                # Case-insensitive subject name resolution — overrides whatever the
+                # LLM returned with the canonical full name from config.
+                ci_mappings = {k.upper(): v for k, v in settings.subjects.mappings.items()}
+                for entry in result.classwork + result.homework:
+                    resolved = ci_mappings.get(entry.subject_code.strip().upper())
+                    if resolved:
+                        entry.subject_name = resolved
+
                 return result
 
             except (json.JSONDecodeError, ValidationError, ValueError, KeyError) as e:
