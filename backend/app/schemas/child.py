@@ -24,6 +24,7 @@ class ChildUpdate(BaseModel):
     whatsapp_group_name: str | None = None
     sync_interval_minutes: int | None = None
     auto_sync: bool | None = None
+    parse_events: bool | None = None
 
 
 class ChildResponse(BaseModel):
@@ -37,6 +38,7 @@ class ChildResponse(BaseModel):
     last_synced_at: datetime | None
     sync_interval_minutes: int
     auto_sync: bool
+    parse_events: bool
     created_at: datetime
 
 

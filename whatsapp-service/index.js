@@ -135,11 +135,15 @@ app.get('/groups/:groupId/messages', async (req, res) => {
     if (!chat) return res.status(404).json({ error: 'Group not found' })
     const messages = await chat.fetchMessages({ limit })
 
+    const useFilter = req.query.no_filter !== 'true'
     const filtered = messages
       .filter((m) => {
         if (since && m.timestamp <= since) return false
-        const body = (m.body || '').toLowerCase()
-        return body.includes(MESSAGE_FILTER.toLowerCase())
+        if (useFilter) {
+          const body = (m.body || '').toLowerCase()
+          return body.includes(MESSAGE_FILTER.toLowerCase())
+        }
+        return true
       })
       .map((m) => ({
         id: m.id._serialized,

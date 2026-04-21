@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
 import { configApi } from '../../api'
-import EventsPanel from '../Events/EventsPanel'
 import WhatsAppPanel from '../WhatsApp/WhatsAppPanel'
 
 export default function SettingsView({ child, onChildUpdate }) {
@@ -16,11 +15,6 @@ export default function SettingsView({ child, onChildUpdate }) {
       <section className="bg-white rounded-lg border border-gray-200 p-4">
         <h2 className="text-base font-semibold text-gray-800 mb-4">WhatsApp Sync</h2>
         <WhatsAppPanel child={child} onChildUpdate={onChildUpdate} />
-      </section>
-
-      {/* Events section */}
-      <section className="bg-white rounded-lg border border-gray-200 p-4">
-        <EventsPanel />
       </section>
 
       {/* Config info */}

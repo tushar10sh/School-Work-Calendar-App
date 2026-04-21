@@ -2,13 +2,22 @@ import asyncio
 import json
 import re
 import logging
-from datetime import date
+from datetime import date, datetime
+from typing import Optional
 
 import httpx
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from app.config import get_settings
 from app.schemas.planner import ParsedOllamaResult
+
+
+class ParsedEventResult(BaseModel):
+    is_event: bool
+    title: Optional[str] = None
+    description: Optional[str] = None
+    event_date: Optional[date] = None
+    event_type: str = "OTHER"
 
 logger = logging.getLogger(__name__)
 
@@ -103,3 +112,62 @@ async def parse_whatsapp_message(message: str) -> ParsedOllamaResult:
     raise RuntimeError(
         f"Failed to parse message after 3 attempts. Last error: {last_error}"
     )
+
+
+def _build_event_prompt(message: str, message_date: str) -> str:
+    return f"""You are a school communication parser. This message was sent on {message_date}.
+
+Analyze the WhatsApp message below. Decide if it describes an actionable event, activity, or deadline for parents or children.
+
+INCLUDE as events:
+- Parent-teacher meetings or school meetings
+- School trips, sports days, cultural programs, special activities
+- Requests to submit, sign, or return forms, fees, or permission slips by a date
+- Requests to send back something on a specific day (e.g. "send it back on Monday")
+- Any message where a parent or child must act by a named day or date
+
+RESOLVE relative dates from the message date ({message_date}):
+- "Monday" or "this Monday" → the nearest Monday on or after {message_date}
+- "by Friday" → nearest Friday on or after {message_date}
+- "next week" → 7 days after {message_date}
+
+EXCLUDE:
+- Routine daily classwork or homework (those belong in the daily planner)
+- Announcements with no required action or no date
+- Planner-format messages (containing Cw/Pw sections)
+
+event_type must be exactly one of: SCHOOL_EVENT, PARENT_MEETING, OTHER
+
+Return ONLY valid JSON — nothing else:
+If an event: {{"is_event":true,"title":"concise title under 60 chars","description":"full context from the message","event_date":"YYYY-MM-DD","event_type":"SCHOOL_EVENT|PARENT_MEETING|OTHER"}}
+If not an event: {{"is_event":false}}
+
+Message:
+{message}"""
+
+
+async def parse_event_from_message(message: str, message_timestamp: int | None = None) -> Optional[ParsedEventResult]:
+    settings = get_settings()
+    if message_timestamp:
+        message_date = datetime.utcfromtimestamp(message_timestamp).strftime("%Y-%m-%d")
+    else:
+        message_date = datetime.utcnow().strftime("%Y-%m-%d")
+    full_prompt = _build_event_prompt(message, message_date)
+
+    try:
+        async with httpx.AsyncClient(timeout=settings.ollama.timeout) as client:
+            response = await client.post(
+                f"{settings.ollama.base_url}/api/generate",
+                json={"model": settings.ollama.model, "prompt": full_prompt, "stream": False, "format": "json"},
+            )
+            response.raise_for_status()
+            raw_text = response.json().get("response", "")
+            cleaned = _extract_json(_strip_fences(raw_text))
+            parsed = json.loads(cleaned)
+            result = ParsedEventResult(**parsed)
+            if not result.is_event or not result.event_date or not result.title:
+                return None
+            return result
+    except Exception as e:
+        logger.warning("Event parse failed: %s", e)
+        return None

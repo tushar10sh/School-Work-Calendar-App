@@ -16,4 +16,5 @@ class Child(Base):
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     sync_interval_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=60)
     auto_sync: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    parse_events: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

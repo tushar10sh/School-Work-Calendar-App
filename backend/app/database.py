@@ -36,7 +36,15 @@ async def get_db():
 
 async def init_db():
     from app.models import __all_models__  # noqa: F401 — ensures all models are registered
+    from sqlalchemy import text
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        # Enable WAL mode for better concurrent read performance
-        await conn.execute(__import__("sqlalchemy", fromlist=["text"]).text("PRAGMA journal_mode=WAL"))
+        await conn.execute(text("PRAGMA journal_mode=WAL"))
+        # Additive migrations for new columns on existing databases
+        for stmt in [
+            "ALTER TABLE children ADD COLUMN parse_events INTEGER NOT NULL DEFAULT 0",
+        ]:
+            try:
+                await conn.execute(text(stmt))
+            except Exception:
+                pass  # Column already exists

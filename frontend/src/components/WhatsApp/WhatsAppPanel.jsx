@@ -72,6 +72,11 @@ export default function WhatsAppPanel({ child, onChildUpdate }) {
     },
   })
 
+  const updateChildMutation = useMutation({
+    mutationFn: (data) => import('../../api').then(m => m.childrenApi.update(child.id, data)),
+    onSuccess: (updated) => onChildUpdate(updated),
+  })
+
   const syncMutation = useMutation({
     mutationFn: () => syncApi.trigger(),
     onSuccess: () => {
@@ -209,7 +214,10 @@ export default function WhatsAppPanel({ child, onChildUpdate }) {
             {syncStatus?.last_synced_at && (
               <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
                 <Clock size={11} />
-                Last synced {formatDistanceToNow(new Date(syncStatus.last_synced_at), { addSuffix: true })}
+                Last synced {formatDistanceToNow(
+                  new Date(syncStatus.last_synced_at.endsWith('Z') ? syncStatus.last_synced_at : syncStatus.last_synced_at + 'Z'),
+                  { addSuffix: true }
+                )}
               </p>
             )}
           </div>
@@ -228,9 +236,35 @@ export default function WhatsAppPanel({ child, onChildUpdate }) {
         </div>
       )}
 
+      {/* Parse events toggle */}
+      {child.whatsapp_group_id && (
+        <div className="border-t border-gray-100 pt-4 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium text-gray-600">Auto-detect Events</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Parse non-planner messages for school events &amp; parent activities
+            </p>
+          </div>
+          <button
+            onClick={() => updateChildMutation.mutate({ parse_events: !child.parse_events })}
+            disabled={updateChildMutation.isPending}
+            className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+              child.parse_events ? 'bg-blue-500' : 'bg-gray-200'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ${
+                child.parse_events ? 'translate-x-4' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+      )}
+
       {syncMutation.data && (
         <div className="text-xs bg-green-50 text-green-700 rounded-lg px-3 py-2 border border-green-200">
-          Sync complete — {syncMutation.data.parsed} message(s) parsed from {syncMutation.data.messages_found} found
+          Sync complete — {syncMutation.data.parsed} message(s) parsed
+          {syncMutation.data.events_added > 0 && `, ${syncMutation.data.events_added} event(s) added`}
         </div>
       )}
     </div>

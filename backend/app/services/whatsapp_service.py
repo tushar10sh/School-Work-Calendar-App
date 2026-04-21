@@ -40,6 +40,16 @@ async def get_group_messages(group_id: str, since: int | None = None) -> list[di
         return resp.json()
 
 
+async def get_all_group_messages(group_id: str, since: int | None = None) -> list[dict]:
+    params = {"limit": 100, "no_filter": "true"}
+    if since:
+        params["since"] = since
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.get(_url(f"/groups/{group_id}/messages"), params=params)
+        resp.raise_for_status()
+        return resp.json()
+
+
 async def reconnect() -> dict:
     async with httpx.AsyncClient(timeout=10) as client:
         resp = await client.post(_url("/reconnect"))
