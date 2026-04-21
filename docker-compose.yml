@@ -1,0 +1,53 @@
+services:
+  backend:
+    build: ./backend
+    container_name: school-planner-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - planner_data:/app/data
+      - ./config.yaml:/app/config.yaml:ro
+    environment:
+      - CONFIG_PATH=/app/config.yaml
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  whatsapp-service:
+    build: ./whatsapp-service
+    container_name: school-planner-whatsapp
+    ports:
+      - "3001:3001"
+    volumes:
+      - whatsapp_sessions:/app/sessions
+    environment:
+      - PORT=3001
+      - MESSAGE_FILTER=planner
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/status', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  frontend:
+    build: ./frontend
+    container_name: school-planner-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  planner_data:
+    name: school-planner-data
+  whatsapp_sessions:
+    name: school-planner-whatsapp-sessions

@@ -1,0 +1,14 @@
+{
+  "name": "school-planner-whatsapp",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "qrcode": "^1.5.4",
+    "whatsapp-web.js": "https://github.com/pedroslopez/whatsapp-web.js"
+  }
+}

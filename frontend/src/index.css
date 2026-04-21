@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* react-big-calendar overrides */
+.rbc-calendar {
+  height: calc(100vh - 140px);
+  min-height: 400px;
+}
+
+.rbc-toolbar {
+  @apply mb-4;
+}
+
+.rbc-toolbar button {
+  @apply rounded px-3 py-1 text-sm border border-gray-300 hover:bg-gray-100 transition-colors;
+}
+
+.rbc-toolbar button.rbc-active {
+  @apply bg-blue-500 text-white border-blue-500;
+}
+
+.rbc-month-view {
+  @apply border border-gray-200 rounded-lg overflow-hidden;
+}
+
+.rbc-header {
+  @apply bg-gray-50 py-2 text-sm font-medium text-gray-600;
+}
+
+.rbc-day-bg.rbc-today {
+  @apply bg-blue-50;
+}
+
+.rbc-event {
+  @apply rounded text-xs font-medium px-1 py-0.5 border-0;
+}
+
+.rbc-event.cw-event {
+  @apply bg-blue-500;
+}
+
+.rbc-event.pw-event {
+  @apply bg-amber-500;
+}
+
+.rbc-event.event-event {
+  @apply bg-green-500;
+}
+
+.rbc-event.test-event {
+  @apply bg-red-500;
+}
+
+.rbc-show-more {
+  @apply text-blue-500 text-xs font-medium;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400;
+}

@@ -1,0 +1,63 @@
+app:
+  name: "School Planner"
+  timezone: "Asia/Kolkata"
+
+database:
+  path: "./data/school_planner.db"
+
+ollama:
+  base_url: "http://host.docker.internal:11434"
+  model: "gemma3:4b"
+  timeout: 60
+
+subjects:
+  mappings:
+    AEB: "Active English - 1"
+    AEW: "Active English Workbook - 1"
+    ETB: "Mridang - 1"
+    EAB: "English Assignment Booklet"
+    WOW: "My World of Words - 1"
+    ECW: "English Classwork (4 line/100 pg/gap)"
+    EA: "English Activity (4 line/150 pg/gap)"
+    HTB: "Hindi Text Book - Sarangi - 1"
+    HCW: "Hindi Class Work (single line/100 pg)"
+    HA: "Hindi Activity (single line/150 pg)"
+    HS: "(Yali Hindi Skills)"
+    HWB: "Hindi Spiral Book with Matra words"
+    MTB: "Maths Text Book - Joyful Mathematics 1"
+    MAB: "Maths Assignment Booklet"
+    MCW: "Maths Classwork (square line/200 pg)"
+    GK: "Knowledge Walk - 1"
+    YALI: "Yali Stories - 1"
+    "A/C bk": "Drawing book A4 (Art and Craft)"
+    "Guj bk": "Kaka vachan - 1"
+    RAB: "Revision Assignment Booklet"
+
+sections:
+  cw_aliases:
+    - "Cw"
+    - "CW"
+    - "cw"
+    - "Class Work"
+    - "Classwork"
+    - "Class work"
+  pw_aliases:
+    - "Pw"
+    - "PW"
+    - "pw"
+    - "Home Work"
+    - "Homework"
+    - "HW"
+    - "hw"
+    - "Practice Work"
+
+auth:
+  secret_key: "change-this-to-a-random-secret-in-production"
+
+sync:
+  auto_sync: true
+  default_interval_minutes: 60
+
+whatsapp:
+  service_url: "http://whatsapp-service:3001"
+  message_filter: "planner"
