@@ -43,6 +43,9 @@ async def init_db():
         # Additive migrations for new columns on existing databases
         for stmt in [
             "ALTER TABLE children ADD COLUMN parse_events INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE events ADD COLUMN source_message TEXT",
+            "ALTER TABLE events ADD COLUMN source_timestamp INTEGER",
+            "ALTER TABLE events ADD COLUMN source_sender TEXT",
         ]:
             try:
                 await conn.execute(text(stmt))

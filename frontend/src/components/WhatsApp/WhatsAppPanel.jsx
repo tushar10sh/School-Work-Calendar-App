@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Wifi, WifiOff, RefreshCw, Link, Unlink, Loader2, CheckCircle, QrCode, Clock } from 'lucide-react'
+import { Wifi, WifiOff, RefreshCw, Link, Loader2, CheckCircle, QrCode, Clock } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { whatsappApi, syncApi } from '../../api'
 
@@ -21,9 +21,66 @@ function StatusBadge({ status }) {
   )
 }
 
+function SyncProgress({ state }) {
+  if (!state) return null
+
+  const { stage, done = 0, total = 0, parsed, events_added, error, message } = state
+
+  const isDone = stage === 'done'
+  const isFetching = stage === 'fetching' || stage === 'events_fetching'
+
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0
+
+  let label = ''
+  let showBar = false
+  if (isFetching) {
+    label = message || 'Fetching…'
+  } else if (stage === 'planner') {
+    label = `Parsing planner: ${done} / ${total}`
+    showBar = true
+  } else if (stage === 'events') {
+    label = total === 0
+      ? 'No new messages to scan for events'
+      : `Scanning for events: ${done} / ${total}`
+    showBar = total > 0
+  } else if (isDone && error) {
+    label = `Error: ${error}`
+  } else if (isDone) {
+    label = `Done — ${parsed} planner message(s) parsed${events_added > 0 ? `, ${events_added} event(s) added` : ''}`
+  }
+
+  return (
+    <div className={`rounded-lg px-3 py-2 border text-xs space-y-1.5 ${
+      isDone && !error ? 'bg-green-50 border-green-200 text-green-700' :
+      error ? 'bg-red-50 border-red-200 text-red-600' :
+      'bg-blue-50 border-blue-200 text-blue-700'
+    }`}>
+      <div className="flex items-center gap-2">
+        {!isDone && <Loader2 size={12} className="animate-spin flex-shrink-0" />}
+        <span>{label}</span>
+      </div>
+      {showBar && (
+        <div className="w-full bg-white/60 rounded-full h-1.5 overflow-hidden">
+          <div
+            className="h-full rounded-full bg-blue-400 transition-all duration-300"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      )}
+      {isFetching && (
+        <div className="w-full bg-white/60 rounded-full h-1.5 overflow-hidden">
+          <div className="h-full rounded-full bg-blue-400 animate-pulse w-full" />
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function WhatsAppPanel({ child, onChildUpdate }) {
   const queryClient = useQueryClient()
   const [selectedGroup, setSelectedGroup] = useState(null)
+  const [syncState, setSyncState] = useState(null)
+  const abortRef = useRef(null)
 
   const { data: waStatus } = useQuery({
     queryKey: ['whatsapp-status'],
@@ -77,17 +134,52 @@ export default function WhatsAppPanel({ child, onChildUpdate }) {
     onSuccess: (updated) => onChildUpdate(updated),
   })
 
-  const syncMutation = useMutation({
-    mutationFn: () => syncApi.trigger(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sync-status'] })
-      queryClient.invalidateQueries({ queryKey: ['planner-range'] })
-    },
-  })
-
   const status = waStatus?.status || 'UNREACHABLE'
   const isConnected = status === 'CONNECTED'
   const isQRPending = status === 'QR_PENDING'
+  const isSyncing = syncState !== null && syncState.stage !== 'done'
+
+  async function handleSync() {
+    setSyncState({ stage: 'fetching', message: 'Starting…' })
+    const url = syncApi.streamUrl()
+
+    try {
+      const response = await fetch(url)
+      if (!response.ok) {
+        setSyncState({ stage: 'done', error: `HTTP ${response.status}`, parsed: 0, events_added: 0 })
+        return
+      }
+
+      const reader = response.body.getReader()
+      abortRef.current = reader
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() // keep incomplete last line
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          try {
+            const data = JSON.parse(line.slice(6))
+            setSyncState(data)
+            if (data.stage === 'done') {
+              queryClient.invalidateQueries({ queryKey: ['sync-status'] })
+              queryClient.invalidateQueries({ queryKey: ['planner-range'] })
+              queryClient.invalidateQueries({ queryKey: ['events'] })
+            }
+          } catch (_) {}
+        }
+      }
+    } catch (err) {
+      setSyncState({ stage: 'done', error: err.message, parsed: 0, events_added: 0 })
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -133,7 +225,7 @@ export default function WhatsAppPanel({ child, onChildUpdate }) {
 
       {/* Connect / Reconnect / Disconnect buttons */}
       <div className="flex gap-2 flex-wrap">
-        {!isConnected && status !== 'LOADING' && (
+        {!isConnected && (
           <button
             onClick={() => reconnectMutation.mutate()}
             disabled={reconnectMutation.isPending}
@@ -144,7 +236,7 @@ export default function WhatsAppPanel({ child, onChildUpdate }) {
             ) : (
               <Wifi size={14} />
             )}
-            {status === 'DISCONNECTED' || status === 'UNREACHABLE' ? 'Connect' : 'Reconnect'}
+            {status === 'LOADING' ? 'Stuck? Force Reconnect' : status === 'DISCONNECTED' || status === 'UNREACHABLE' ? 'Connect' : 'Reconnect'}
           </button>
         )}
         {isConnected && (
@@ -208,31 +300,35 @@ export default function WhatsAppPanel({ child, onChildUpdate }) {
 
       {/* Sync controls */}
       {child.whatsapp_group_id && (
-        <div className="border-t border-gray-100 pt-4 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-medium text-gray-600">Manual Sync</p>
-            {syncStatus?.last_synced_at && (
-              <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
-                <Clock size={11} />
-                Last synced {formatDistanceToNow(
-                  new Date(syncStatus.last_synced_at.endsWith('Z') ? syncStatus.last_synced_at : syncStatus.last_synced_at + 'Z'),
-                  { addSuffix: true }
-                )}
-              </p>
-            )}
+        <div className="border-t border-gray-100 pt-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-gray-600">Manual Sync</p>
+              {syncStatus?.last_synced_at && (
+                <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                  <Clock size={11} />
+                  Last synced {formatDistanceToNow(
+                    new Date(syncStatus.last_synced_at.endsWith('Z') ? syncStatus.last_synced_at : syncStatus.last_synced_at + 'Z'),
+                    { addSuffix: true }
+                  )}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={handleSync}
+              disabled={isSyncing || !isConnected}
+              className="flex items-center gap-1.5 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
+            >
+              {isSyncing ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <RefreshCw size={14} />
+              )}
+              {isSyncing ? 'Syncing…' : 'Sync Now'}
+            </button>
           </div>
-          <button
-            onClick={() => syncMutation.mutate()}
-            disabled={syncMutation.isPending || !isConnected}
-            className="flex items-center gap-1.5 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
-          >
-            {syncMutation.isPending ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <RefreshCw size={14} />
-            )}
-            Sync Now
-          </button>
+
+          <SyncProgress state={syncState} />
         </div>
       )}
 
@@ -258,13 +354,6 @@ export default function WhatsAppPanel({ child, onChildUpdate }) {
               }`}
             />
           </button>
-        </div>
-      )}
-
-      {syncMutation.data && (
-        <div className="text-xs bg-green-50 text-green-700 rounded-lg px-3 py-2 border border-green-200">
-          Sync complete — {syncMutation.data.parsed} message(s) parsed
-          {syncMutation.data.events_added > 0 && `, ${syncMutation.data.events_added} event(s) added`}
         </div>
       )}
     </div>

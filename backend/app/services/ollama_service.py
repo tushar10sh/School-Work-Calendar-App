@@ -114,6 +114,15 @@ async def parse_whatsapp_message(message: str) -> ParsedOllamaResult:
     )
 
 
+def _title_in_message(title: str, body: str) -> bool:
+    """Sanity check: at least one significant word from the LLM title must appear in body."""
+    significant = [w.lower() for w in title.split() if len(w) > 3]
+    if not significant:
+        return True
+    body_lower = body.lower()
+    return any(w in body_lower for w in significant)
+
+
 def _build_event_prompt(message: str, message_date: str) -> str:
     return f"""You are a school communication parser. This message was sent on {message_date}.
 
@@ -166,6 +175,12 @@ async def parse_event_from_message(message: str, message_timestamp: int | None =
             parsed = json.loads(cleaned)
             result = ParsedEventResult(**parsed)
             if not result.is_event or not result.event_date or not result.title:
+                return None
+            if not _title_in_message(result.title, message):
+                logger.warning(
+                    "Hallucination guard rejected event '%s' — title words absent from source message",
+                    result.title,
+                )
                 return None
             return result
     except Exception as e:

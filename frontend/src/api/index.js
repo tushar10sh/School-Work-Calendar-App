@@ -85,4 +85,6 @@ export const whatsappApi = {
 export const syncApi = {
   trigger: () => api.post('/sync/trigger').then((r) => r.data),
   status: () => api.get('/sync/status').then((r) => r.data),
+  purge: () => api.post('/sync/purge').then((r) => r.data),
+  streamUrl: () => `/api/sync/stream?token=${localStorage.getItem('token') ?? ''}`,
 }

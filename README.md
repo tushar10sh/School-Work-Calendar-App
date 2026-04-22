@@ -5,14 +5,17 @@ A web app for tracking your child's daily classwork and homework using a calenda
 ## Features
 
 - **Child profiles** — multiple children, each with their own PIN and data
-- **WhatsApp sync** — connect your WhatsApp account via QR code; messages are pulled from a chosen group and parsed automatically
-- **Auto-sync** — configurable per-child interval (default 60 min); also available on demand via a Sync Now button
-- **AI parsing** — local Ollama LLM extracts date, classwork, homework, and bag items from the planner message format
+- **WhatsApp sync** — connect via QR code; messages are pulled from a chosen group and parsed automatically with a real-time progress bar
+- **Auto-sync** — configurable per-child interval (default 60 min); also available on demand via Sync Now
+- **AI parsing** — local Ollama LLM extracts date, classwork, homework, and bag items from the planner message format; subject codes resolved case-insensitively
+- **Event detection** — optional toggle to scan non-planner group messages for school events, parent meetings, and activity deadlines; hallucination guard prevents false positives
+- **Message deduplication** — processed WhatsApp messages are tracked so each message is run through the AI exactly once, regardless of how many syncs occur
 - **Calendar view** — month view with color-coded dots for CW, PW, events, and tests
-- **Day panel** — click any date to see CW/PW entries with completion checkboxes, bag items, events, and tests
-- **Events** — school events, holidays, parent meetings
+- **Day panel** — click any date for CW/PW entries with completion checkboxes, bag items with full subject names, events, and tests
+- **Events tab** — school events, holidays, parent meetings; click any auto-detected event to see the original WhatsApp message, sender, and send time
 - **Todos** — task list with priority (High/Medium/Low) and due dates
 - **Test Alerts** — upcoming test tracker with live countdown
+- **Re-sync everything** — purge the message cache from Settings to force a full reprocess on the next sync
 - **Configurable** — subject code mappings, Ollama model, sync interval all in `config.yaml`
 
 ## Tech Stack
@@ -59,7 +62,8 @@ docker compose up --build
 5. Click **Connect** — a QR code will appear
 6. Open WhatsApp on your phone → Settings → Linked Devices → Link a Device → scan the QR code
 7. Once connected, select the school group from the dropdown and click **Use "Group Name"**
-8. Click **Sync Now** to pull the latest planner messages, or wait for the auto-sync
+8. *(Optional)* Enable **Auto-detect Events** to scan non-planner messages for school events and parent activities
+9. Click **Sync Now** — a live progress bar will track each stage of the sync
 
 ## WhatsApp Message Format
 
@@ -87,7 +91,20 @@ My bag- MTB, ETB.
 | Homework | Lines under `Pw`/`PW` | `Hindi — writing vyanjan…` |
 | Bag items | After `My bag-` | `MTB`, `ETB` |
 
-Subject codes are resolved to full names via the `subjects.mappings` section in `config.yaml`. Only messages containing the word "planner" (configurable) are picked up during sync.
+Subject codes are resolved to full names via the `subjects.mappings` section in `config.yaml`. Matching is case-insensitive. Only messages containing the word "planner" (configurable) are picked up during the planner sync pass.
+
+## Event Detection
+
+When **Auto-detect Events** is enabled, every non-planner message in the group is scanned by the AI for actionable events:
+
+- Parent-teacher meetings and school meetings
+- School trips, sports days, cultural programs
+- Requests to submit forms, fees, or permission slips by a date
+- Any message where a parent or child must act by a specific day
+
+Each message is processed **exactly once** — processed IDs are stored in the database, so re-syncing never re-runs old messages. A hallucination guard requires that at least one significant word from the AI-generated event title actually appears in the source message, preventing fabricated events.
+
+Click any event in the **Events** tab to see the original WhatsApp message, the sender's number, and the time it was sent.
 
 ## Configuration
 
@@ -107,7 +124,7 @@ sync:
 
 whatsapp:
   service_url: "http://whatsapp-service:3001"
-  message_filter: "planner"      # Only messages containing this word are synced
+  message_filter: "planner"      # Only messages containing this word are treated as planner messages
 
 subjects:
   mappings:
@@ -159,52 +176,53 @@ School-Work-Calendar-App/
 │   └── app/
 │       ├── main.py                  # FastAPI app + APScheduler auto-sync
 │       ├── config.py                # Typed config loader
-│       ├── database.py              # Async SQLAlchemy + SQLite
+│       ├── database.py              # Async SQLAlchemy + additive migrations
 │       ├── dependencies.py          # JWT auth dependency
 │       ├── core/security.py         # PIN hashing + JWT utils
-│       ├── models/                  # ORM models (6 tables)
+│       ├── models/                  # ORM models (7 tables)
 │       │   ├── child.py
 │       │   ├── planner.py
 │       │   ├── bag.py
-│       │   ├── event.py
+│       │   ├── event.py             # Includes source_message / sender fields
 │       │   ├── todo.py
-│       │   └── test_alert.py
-│       ├── schemas/                 # Pydantic request/response schemas
+│       │   ├── test_alert.py
+│       │   └── whatsapp_message.py  # Tracks processed WA message IDs (dedup)
+│       ├── schemas/
 │       ├── routers/
-│       │   ├── auth.py              # Login + /me
-│       │   ├── children.py          # Child CRUD
-│       │   ├── planner.py           # Parse + CRUD + calendar range
+│       │   ├── auth.py
+│       │   ├── children.py
+│       │   ├── planner.py
 │       │   ├── events.py
 │       │   ├── todos.py
 │       │   ├── test_alerts.py
-│       │   ├── whatsapp.py          # Proxy to whatsapp-service
-│       │   ├── sync.py              # Manual trigger + status
+│       │   ├── whatsapp.py
+│       │   ├── sync.py              # /trigger, /stream (SSE), /purge, /status
 │       │   └── config_router.py
 │       └── services/
-│           ├── ollama_service.py    # Ollama HTTP client + JSON extraction
+│           ├── ollama_service.py    # Planner parser + event parser with hallucination guard
 │           ├── whatsapp_service.py  # HTTP client for whatsapp-service
-│           └── sync_service.py      # Fetch → parse → save pipeline
+│           └── sync_service.py      # Streaming async-generator sync pipeline
 ├── whatsapp-service/
 │   ├── Dockerfile                   # node:20-bullseye + Chromium
 │   ├── package.json
-│   └── index.js                     # Express + whatsapp-web.js
+│   └── index.js                     # Express + whatsapp-web.js (GitHub main)
 └── frontend/
     ├── Dockerfile                   # Multi-stage: Vite build → Nginx
-    ├── nginx.conf                   # Proxies /api/* to backend
+    ├── nginx.conf                   # /api/sync/stream has buffering disabled for SSE
     └── src/
-        ├── App.jsx                  # Auth gate + tab navigation + child switcher
-        ├── hooks/useAuth.js         # JWT auth state (localStorage)
-        ├── api/index.js             # Axios client with auth interceptor
+        ├── App.jsx                  # Auth gate + tab navigation (Calendar|Events|Todos|Tests|Settings)
+        ├── hooks/useAuth.js         # JWT auth state + client-side expiry check
+        ├── api/index.js             # Axios client + syncApi.streamUrl for SSE
         └── components/
-            ├── Auth/LoginPage.jsx   # Child card grid + PIN modal + add child
+            ├── Auth/LoginPage.jsx
             ├── Calendar/            # react-big-calendar month view
             ├── DayView/             # Slide-in day detail panel
             ├── MessageParser/       # Paste & parse modal
-            ├── WhatsApp/            # QR code, group selector, sync controls
-            ├── Events/
+            ├── WhatsApp/            # QR code, group selector, streaming sync + progress bar
+            ├── Events/              # Events list + SourceModal (original WA message)
             ├── Todos/
             ├── TestAlerts/
-            └── Settings/            # WhatsApp panel + events + config viewer
+            └── Settings/            # WhatsApp panel + re-sync/purge + config viewer
 ```
 
 ## API Reference
@@ -242,7 +260,10 @@ School-Work-Calendar-App/
 | `GET` | `/api/whatsapp/qr` | QR code data URL |
 | `GET` | `/api/whatsapp/groups` | List WhatsApp groups |
 | `POST` | `/api/whatsapp/connect-group` | Set group for this child |
-| `POST` | `/api/sync/trigger` | Trigger immediate sync |
+| `POST` | `/api/whatsapp/reconnect` | Force reconnect (use when stuck at LOADING) |
+| `POST` | `/api/sync/trigger` | Trigger sync (blocking, returns summary) |
+| `GET` | `/api/sync/stream?token=` | Streaming SSE sync with per-message progress |
+| `POST` | `/api/sync/purge` | Clear message cache + auto-detected events |
 | `GET` | `/api/sync/status` | Last sync time + settings |
 | `GET` | `/api/config` | Subject mappings + Ollama config |
 

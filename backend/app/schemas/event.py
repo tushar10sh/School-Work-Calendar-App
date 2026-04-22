@@ -30,4 +30,7 @@ class EventResponse(BaseModel):
     event_date: date
     event_type: str
     color: str
+    source_message: str | None = None
+    source_timestamp: int | None = None
+    source_sender: str | None = None
     created_at: datetime

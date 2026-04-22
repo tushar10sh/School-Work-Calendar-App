@@ -5,6 +5,14 @@ function loadFromStorage() {
   try {
     const token = localStorage.getItem('token')
     const child = JSON.parse(localStorage.getItem('child') || 'null')
+    if (token) {
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      if (payload.exp && payload.exp * 1000 < Date.now()) {
+        localStorage.removeItem('token')
+        localStorage.removeItem('child')
+        return { token: null, child: null }
+      }
+    }
     return { token, child }
   } catch {
     return { token: null, child: null }
