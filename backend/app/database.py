@@ -46,6 +46,7 @@ async def init_db():
             "ALTER TABLE events ADD COLUMN source_message TEXT",
             "ALTER TABLE events ADD COLUMN source_timestamp INTEGER",
             "ALTER TABLE events ADD COLUMN source_sender TEXT",
+            "ALTER TABLE events ADD COLUMN action_taken INTEGER NOT NULL DEFAULT 0",
         ]:
             try:
                 await conn.execute(text(stmt))

@@ -44,6 +44,7 @@ export default function App() {
   const [isPanelOpen, setIsPanelOpen] = useState(false)
   const [isParseModalOpen, setIsParseModalOpen] = useState(false)
   const [showChildMenu, setShowChildMenu] = useState(false)
+  const [highlightEventDate, setHighlightEventDate] = useState(null)
   const queryClient = useQueryClient()
 
   if (!isAuthenticated) {
@@ -53,6 +54,11 @@ export default function App() {
   function handleDaySelect(dateStr) {
     setSelectedDate(dateStr)
     setIsPanelOpen(true)
+  }
+
+  function handleEventDotClick(dateStr) {
+    setHighlightEventDate(dateStr)
+    setActiveTab('events')
   }
 
   function handleParseDone(parsedDate) {
@@ -140,9 +146,11 @@ export default function App() {
       >
         <div className="flex-1 min-w-0">
           {activeTab === 'calendar' && (
-            <CalendarView onDaySelect={handleDaySelect} selectedDate={selectedDate} />
+            <CalendarView onDaySelect={handleDaySelect} onEventDotClick={handleEventDotClick} selectedDate={selectedDate} />
           )}
-          {activeTab === 'events' && <EventsPanel />}
+          {activeTab === 'events' && (
+            <EventsPanel highlightDate={highlightEventDate} onHighlightClear={() => setHighlightEventDate(null)} />
+          )}
           {activeTab === 'todos' && <TodosView />}
           {activeTab === 'tests' && <TestAlertsView />}
           {activeTab === 'settings' && (

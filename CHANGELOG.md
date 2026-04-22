@@ -4,6 +4,29 @@ All notable changes to School Planner are documented here.
 
 ---
 
+## [Unreleased] — 2026-04-22 (2)
+
+### Added
+
+#### Event date sort filter
+- Events panel header now has a "Soonest first / Latest first" toggle button; applies to both the Upcoming and Past sections independently
+- Sort is client-side; no backend change required
+
+#### Event action-taken flag
+- New `action_taken` boolean column on the `events` table (additive `ALTER TABLE` migration applied at startup)
+- `EventUpdate` schema and `EventResponse` schema include `action_taken`; `PATCH /api/events/{id}` accepts it
+- Each event row shows a circle icon on hover; clicking toggles the flag without opening the source modal
+- Events with `action_taken = true` display a green filled checkmark and a strikethrough title; the icon remains visible (not just on hover) so the state is always clear
+
+#### Calendar → Events tab navigation with highlight
+- Clicking an **Event** dot (green) on the calendar now navigates to the Events tab instead of opening the Day Panel — CW/PW/Test dots still open the Day Panel as before
+- `CalendarView` detects `event.resource === 'event'` in `handleSelectEvent` and calls the new `onEventDotClick(dateStr)` callback
+- `App.jsx` sets `highlightEventDate` state and switches to the events tab
+- `EventsPanel` receives `highlightDate` and `onHighlightClear` props; a `useEffect` finds matching event IDs, scrolls the first one into view (`scrollIntoView({ behavior: 'smooth', block: 'center' })`), applies an amber ring + background highlight for 2 seconds, then clears
+- Row refs are tracked with `useCallback` / `useRef` map so no DOM query is needed
+
+---
+
 ## [Unreleased] — 2026-04-22
 
 ### Added

@@ -19,6 +19,7 @@ class EventUpdate(BaseModel):
     event_date: date | None = None
     event_type: EventType | None = None
     color: str | None = None
+    action_taken: bool | None = None
 
 
 class EventResponse(BaseModel):
@@ -30,6 +31,7 @@ class EventResponse(BaseModel):
     event_date: date
     event_type: str
     color: str
+    action_taken: bool = False
     source_message: str | None = None
     source_timestamp: int | None = None
     source_sender: str | None = None

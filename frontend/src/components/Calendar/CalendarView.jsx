@@ -15,7 +15,7 @@ function formatRange(date) {
   }
 }
 
-export default function CalendarView({ onDaySelect, selectedDate }) {
+export default function CalendarView({ onDaySelect, onEventDotClick, selectedDate }) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const range = useMemo(() => formatRange(currentDate), [currentDate])
 
@@ -67,7 +67,12 @@ export default function CalendarView({ onDaySelect, selectedDate }) {
   }
 
   function handleSelectEvent(event) {
-    onDaySelect(format(event.start, 'yyyy-MM-dd'))
+    const dateStr = format(event.start, 'yyyy-MM-dd')
+    if (event.resource === 'event' && onEventDotClick) {
+      onEventDotClick(dateStr)
+    } else {
+      onDaySelect(dateStr)
+    }
   }
 
   return (

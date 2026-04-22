@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, X, MessageSquare } from 'lucide-react'
+import { Plus, Trash2, X, MessageSquare, CheckCircle2, Circle, ArrowUpDown } from 'lucide-react'
 import { format } from 'date-fns'
 import { eventsApi } from '../../api'
 
@@ -77,11 +77,14 @@ function SourceModal({ event, onClose }) {
   )
 }
 
-export default function EventsPanel() {
+export default function EventsPanel({ highlightDate, onHighlightClear }) {
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
   const [selectedEvent, setSelectedEvent] = useState(null)
+  const [sortAsc, setSortAsc] = useState(true)
+  const [highlightedIds, setHighlightedIds] = useState(new Set())
+  const rowRefs = useRef({})
 
   const { data: events = [] } = useQuery({
     queryKey: ['events'],
@@ -107,9 +110,50 @@ export default function EventsPanel() {
     },
   })
 
+  const actionMutation = useMutation({
+    mutationFn: ({ id, action_taken }) => eventsApi.update(id, { action_taken }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['events'] }),
+  })
+
+  // Highlight rows when navigated from calendar
+  useEffect(() => {
+    if (!highlightDate || !events.length) return
+
+    const matching = events.filter((e) => e.event_date === highlightDate)
+    if (!matching.length) return
+
+    const ids = new Set(matching.map((e) => e.id))
+    setHighlightedIds(ids)
+
+    // Scroll the first matching row into view
+    const firstId = matching[0].id
+    setTimeout(() => {
+      rowRefs.current[firstId]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 50)
+
+    // Clear highlight after 2 s
+    const timer = setTimeout(() => {
+      setHighlightedIds(new Set())
+      onHighlightClear?.()
+    }, 2000)
+
+    return () => clearTimeout(timer)
+  }, [highlightDate, events]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const setRowRef = useCallback((id, el) => {
+    if (el) rowRefs.current[id] = el
+    else delete rowRefs.current[id]
+  }, [])
+
   const today = format(new Date(), 'yyyy-MM-dd')
-  const upcoming = events.filter((e) => e.event_date >= today)
-  const past = events.filter((e) => e.event_date < today)
+
+  const sorted = [...events].sort((a, b) => {
+    const cmp = a.event_date.localeCompare(b.event_date)
+    return sortAsc ? cmp : -cmp
+  })
+
+  const upcoming = sorted.filter((e) => e.event_date >= today)
+  const past = sorted.filter((e) => e.event_date < today)
 
   function handleSubmit(e) {
     e.preventDefault()
@@ -119,15 +163,26 @@ export default function EventsPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <h2 className="text-base font-semibold text-gray-800">Events</h2>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-1.5 bg-green-500 hover:bg-green-600 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
-        >
-          <Plus size={14} />
-          Add Event
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Sort toggle */}
+          <button
+            onClick={() => setSortAsc((v) => !v)}
+            title={sortAsc ? 'Showing: Soonest first' : 'Showing: Latest first'}
+            className="flex items-center gap-1.5 text-xs text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-700 bg-white px-2.5 py-1.5 rounded-lg transition-colors"
+          >
+            <ArrowUpDown size={12} />
+            {sortAsc ? 'Soonest first' : 'Latest first'}
+          </button>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="flex items-center gap-1.5 bg-green-500 hover:bg-green-600 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <Plus size={14} />
+            Add Event
+          </button>
+        </div>
       </div>
 
       {showForm && (
@@ -205,9 +260,26 @@ export default function EventsPanel() {
         </form>
       )}
 
-      <EventList title="Upcoming" events={upcoming} onSelect={setSelectedEvent} onDelete={(id) => deleteMutation.mutate(id)} />
+      <EventList
+        title="Upcoming"
+        events={upcoming}
+        onSelect={setSelectedEvent}
+        onDelete={(id) => deleteMutation.mutate(id)}
+        onToggleAction={(ev) => actionMutation.mutate({ id: ev.id, action_taken: !ev.action_taken })}
+        highlightedIds={highlightedIds}
+        setRowRef={setRowRef}
+      />
       {past.length > 0 && (
-        <EventList title="Past" events={past} onSelect={setSelectedEvent} onDelete={(id) => deleteMutation.mutate(id)} muted />
+        <EventList
+          title="Past"
+          events={past}
+          onSelect={setSelectedEvent}
+          onDelete={(id) => deleteMutation.mutate(id)}
+          onToggleAction={(ev) => actionMutation.mutate({ id: ev.id, action_taken: !ev.action_taken })}
+          highlightedIds={highlightedIds}
+          setRowRef={setRowRef}
+          muted
+        />
       )}
 
       {selectedEvent && (
@@ -217,38 +289,60 @@ export default function EventsPanel() {
   )
 }
 
-function EventList({ title, events, onSelect, onDelete, muted }) {
+function EventList({ title, events, onSelect, onDelete, onToggleAction, highlightedIds, setRowRef, muted }) {
   if (!events.length) return null
   return (
     <div>
       <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{title}</h3>
       <div className="space-y-2">
-        {events.map((ev) => (
-          <div
-            key={ev.id}
-            onClick={() => onSelect(ev)}
-            className={`flex items-center gap-3 bg-white rounded-lg border border-gray-200 px-3 py-2.5 group cursor-pointer hover:border-gray-300 hover:shadow-sm transition-all ${muted ? 'opacity-60' : ''}`}
-          >
-            <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: ev.color }} />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-800 truncate">{ev.title}</p>
-              <p className="text-xs text-gray-400">
-                {format(new Date(ev.event_date + 'T00:00:00'), 'MMM d, yyyy')} &bull;{' '}
-                {TYPE_LABELS[ev.event_type] || ev.event_type}
-                {ev.source_sender && <span className="ml-1">· +{ev.source_sender}</span>}
-              </p>
-            </div>
-            {ev.source_message && (
-              <MessageSquare size={13} className="text-gray-300 flex-shrink-0" />
-            )}
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete(ev.id) }}
-              className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all flex-shrink-0"
+        {events.map((ev) => {
+          const isHighlighted = highlightedIds.has(ev.id)
+          return (
+            <div
+              key={ev.id}
+              ref={(el) => setRowRef(ev.id, el)}
+              onClick={() => onSelect(ev)}
+              className={`flex items-center gap-3 bg-white rounded-lg border px-3 py-2.5 group cursor-pointer transition-all duration-300 ${
+                isHighlighted
+                  ? 'border-amber-400 shadow-md ring-2 ring-amber-300 bg-amber-50'
+                  : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
+              } ${muted && !isHighlighted ? 'opacity-60' : ''}`}
             >
-              <Trash2 size={14} />
-            </button>
-          </div>
-        ))}
+              <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: ev.color }} />
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-medium truncate ${ev.action_taken ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+                  {ev.title}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {format(new Date(ev.event_date + 'T00:00:00'), 'MMM d, yyyy')} &bull;{' '}
+                  {TYPE_LABELS[ev.event_type] || ev.event_type}
+                  {ev.source_sender && <span className="ml-1">· +{ev.source_sender}</span>}
+                </p>
+              </div>
+              {ev.source_message && (
+                <MessageSquare size={13} className="text-gray-300 flex-shrink-0" />
+              )}
+              {/* Action taken toggle */}
+              <button
+                onClick={(e) => { e.stopPropagation(); onToggleAction(ev) }}
+                title={ev.action_taken ? 'Mark as pending' : 'Mark action taken'}
+                className={`flex-shrink-0 transition-colors ${
+                  ev.action_taken
+                    ? 'text-green-500 hover:text-gray-400'
+                    : 'text-gray-200 hover:text-green-400 opacity-0 group-hover:opacity-100'
+                }`}
+              >
+                {ev.action_taken ? <CheckCircle2 size={15} /> : <Circle size={15} />}
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); onDelete(ev.id) }}
+                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all flex-shrink-0"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from sqlalchemy import String, Date, DateTime, Integer, ForeignKey, func
+from sqlalchemy import String, Date, DateTime, Integer, Boolean, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
@@ -14,6 +14,7 @@ class Event(Base):
     event_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     event_type: Mapped[str] = mapped_column(String(30), nullable=False, default="OTHER")
     color: Mapped[str] = mapped_column(String(20), nullable=False, default="#10b981")
+    action_taken: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     source_message: Mapped[str | None] = mapped_column(String(5000), nullable=True)
     source_timestamp: Mapped[int | None] = mapped_column(Integer, nullable=True)
     source_sender: Mapped[str | None] = mapped_column(String(100), nullable=True)

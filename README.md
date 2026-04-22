@@ -12,7 +12,8 @@ A web app for tracking your child's daily classwork and homework using a calenda
 - **Message deduplication** — processed WhatsApp messages are tracked so each message is run through the AI exactly once, regardless of how many syncs occur
 - **Calendar view** — month view with color-coded dots for CW, PW, events, and tests
 - **Day panel** — click any date for CW/PW entries with completion checkboxes, bag items with full subject names, events, and tests
-- **Events tab** — school events, holidays, parent meetings; click any auto-detected event to see the original WhatsApp message, sender, and send time
+- **Events tab** — school events, holidays, parent meetings; sort by date (soonest/latest); mark events as action-taken with a single click; click any auto-detected event to see the original WhatsApp message, sender, and send time
+- **Calendar → Events navigation** — clicking an Event dot on the calendar switches to the Events tab and highlights the matching events with a 2-second amber flash
 - **Todos** — task list with priority (High/Medium/Low) and due dates
 - **Test Alerts** — upcoming test tracker with live countdown
 - **Re-sync everything** — purge the message cache from Settings to force a full reprocess on the next sync
@@ -251,7 +252,7 @@ School-Work-Calendar-App/
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET/POST` | `/api/events` | List / create events |
-| `PATCH/DELETE` | `/api/events/{id}` | Update / delete event |
+| `PATCH/DELETE` | `/api/events/{id}` | Update / delete event (including `action_taken` toggle) |
 | `GET/POST` | `/api/todos` | List (`?completed=false`) / create |
 | `PATCH/DELETE` | `/api/todos/{id}` | Update / delete todo |
 | `GET/POST` | `/api/test-alerts` | List (`?upcoming=true`) / create |
