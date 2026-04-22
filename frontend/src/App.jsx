@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import { Calendar, CheckSquare, Bell, Settings, BookOpen, Plus, LogOut, ChevronDown, CalendarDays, BarChart2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Calendar, CheckSquare, Bell, Settings, BookOpen, Plus, LogOut, ChevronDown, CalendarDays, BarChart2, RefreshCw } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from './hooks/useAuth'
+import { useServiceWorker } from './hooks/useServiceWorker'
 import LoginPage from './components/Auth/LoginPage'
 import CalendarView from './components/Calendar/CalendarView'
 import DayPanel from './components/DayView/DayPanel'
@@ -39,8 +40,29 @@ function ChildAvatar({ child, onClick }) {
   )
 }
 
+function UpdateToast() {
+  const [visible, setVisible] = useState(true)
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setVisible(false)
+      window.location.reload()
+    }, 2500)
+    return () => clearTimeout(timer)
+  }, [])
+
+  if (!visible) return null
+  return (
+    <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2.5 bg-blue-600 text-white text-sm font-medium px-4 py-3 rounded-xl shadow-lg animate-pulse">
+      <RefreshCw size={15} className="animate-spin" />
+      New version available — updating…
+    </div>
+  )
+}
+
 export default function App() {
   const { isAuthenticated, child, login, logout, updateChild } = useAuth()
+  const { updateReady } = useServiceWorker()
   const [activeTab, setActiveTab] = useState('calendar')
   const [selectedDate, setSelectedDate] = useState(null)
   const [isPanelOpen, setIsPanelOpen] = useState(false)
@@ -82,6 +104,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      {updateReady && <UpdateToast />}
       {/* Header */}
       <header className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
