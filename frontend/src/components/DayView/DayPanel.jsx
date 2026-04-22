@@ -78,7 +78,10 @@ export default function DayPanel({ date, onClose }) {
     onError: (_, __, ctx) => {
       queryClient.setQueryData(['planner-day', date], ctx?.prev)
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['planner-day', date] }),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['planner-day', date] })
+      queryClient.invalidateQueries({ queryKey: ['summary'] })
+    },
   })
 
   const deleteMutation = useMutation({
