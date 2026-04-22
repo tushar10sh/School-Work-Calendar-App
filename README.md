@@ -23,6 +23,30 @@ A web app for tracking your child's daily classwork and homework using a calenda
 - **Re-sync everything** — purge the message cache from Settings to force a full reprocess on the next sync
 - **Configurable** — subject code mappings, Ollama model, sync interval all in `config.yaml`
 
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center"><strong>Calendar — Month view</strong><br/><img src="screenshots/Calendar-Monthview.png" alt="Calendar month view with day panel"/></td>
+    <td align="center"><strong>Calendar — Week view</strong><br/><img src="screenshots/Calendar-Weekview.png" alt="Calendar week view with day panel"/></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Events</strong><br/><img src="screenshots/Events.png" alt="Events tab showing upcoming and past events"/></td>
+    <td align="center"><strong>Progress Summary</strong><br/><img src="screenshots/Summary.png" alt="Weekly progress summary with stat cards"/></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Todos</strong><br/><img src="screenshots/Todos-view.png" alt="Todos tab"/></td>
+    <td align="center"><strong>Test Alerts</strong><br/><img src="screenshots/TestAlerts.png" alt="Test Alerts tab"/></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Parse Message Manually</strong><br/><img src="screenshots/Parse-Message-Manually.png" alt="Parse WhatsApp message modal"/></td>
+    <td align="center"><strong>Settings — WhatsApp Sync</strong><br/><img src="screenshots/Setting-Whatsapp.png" alt="WhatsApp sync settings"/></td>
+  </tr>
+  <tr>
+    <td align="center" colspan="2"><strong>Settings — Subject Code Mappings</strong><br/><img src="screenshots/Settings-SubjectCodeMappings.png" alt="Subject code mappings configuration" width="50%"/></td>
+  </tr>
+</table>
+
 ## Tech Stack
 
 | Layer | Technology |
