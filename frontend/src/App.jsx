@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Calendar, CheckSquare, Bell, Settings, BookOpen, Plus, LogOut, ChevronDown, CalendarDays } from 'lucide-react'
+import { Calendar, CheckSquare, Bell, Settings, BookOpen, Plus, LogOut, ChevronDown, CalendarDays, BarChart2 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from './hooks/useAuth'
 import LoginPage from './components/Auth/LoginPage'
@@ -10,12 +10,14 @@ import TodosView from './components/Todos/TodosView'
 import TestAlertsView from './components/TestAlerts/TestAlertsView'
 import SettingsView from './components/Settings/SettingsView'
 import EventsPanel from './components/Events/EventsPanel'
+import SummaryView from './components/Summary/SummaryView'
 
 const TABS = [
   { id: 'calendar', label: 'Calendar', Icon: Calendar },
   { id: 'events', label: 'Events', Icon: CalendarDays },
   { id: 'todos', label: 'Todos', Icon: CheckSquare },
   { id: 'tests', label: 'Test Alerts', Icon: Bell },
+  { id: 'summary', label: 'Summary', Icon: BarChart2 },
   { id: 'settings', label: 'Settings', Icon: Settings },
 ]
 
@@ -153,6 +155,7 @@ export default function App() {
           )}
           {activeTab === 'todos' && <TodosView />}
           {activeTab === 'tests' && <TestAlertsView />}
+          {activeTab === 'summary' && <SummaryView />}
           {activeTab === 'settings' && (
             <SettingsView child={child} onChildUpdate={updateChild} />
           )}

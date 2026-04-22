@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, CheckCircle, Circle, Trash2 } from 'lucide-react'
+import { Plus, CheckCircle, Circle, Trash2, Archive, ArchiveX } from 'lucide-react'
 import { format } from 'date-fns'
 import { todosApi } from '../../api'
 
@@ -20,13 +20,13 @@ const EMPTY_FORM = {
 export default function TodosView() {
   const queryClient = useQueryClient()
   const [filter, setFilter] = useState('all')
+  const [showArchived, setShowArchived] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
 
-  const params = filter === 'active' ? { completed: false } : filter === 'done' ? { completed: true } : {}
-  const { data: todos = [] } = useQuery({
-    queryKey: ['todos', filter],
-    queryFn: () => todosApi.list(params),
+  const { data: allTodos = [] } = useQuery({
+    queryKey: ['todos'],
+    queryFn: () => todosApi.list({}),
   })
 
   const createMutation = useMutation({
@@ -56,17 +56,41 @@ export default function TodosView() {
     createMutation.mutate(data)
   }
 
+  const activeTodos = allTodos.filter((t) => !t.is_archived)
+  const archivedTodos = allTodos.filter((t) => t.is_archived)
+
+  const visibleTodos = (showArchived ? archivedTodos : activeTodos).filter((t) => {
+    if (filter === 'active') return !t.is_completed
+    if (filter === 'done') return t.is_completed
+    return true
+  })
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold text-gray-800">Todos</h2>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-1.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
-        >
-          <Plus size={14} />
-          Add Todo
-        </button>
+        <div className="flex items-center gap-2">
+          {archivedTodos.length > 0 && (
+            <button
+              onClick={() => setShowArchived((v) => !v)}
+              className={`flex items-center gap-1.5 text-xs border px-2.5 py-1.5 rounded-lg transition-colors ${
+                showArchived
+                  ? 'bg-purple-50 border-purple-300 text-purple-700'
+                  : 'text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700 bg-white'
+              }`}
+            >
+              {showArchived ? <ArchiveX size={12} /> : <Archive size={12} />}
+              {showArchived ? 'Hide archived' : `Archived (${archivedTodos.length})`}
+            </button>
+          )}
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="flex items-center gap-1.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <Plus size={14} />
+            Add Todo
+          </button>
+        </div>
       </div>
 
       {/* Filter tabs */}
@@ -149,15 +173,15 @@ export default function TodosView() {
       )}
 
       {/* Todo list */}
-      {todos.length === 0 ? (
+      {visibleTodos.length === 0 ? (
         <p className="text-sm text-gray-400 text-center py-8">No todos</p>
       ) : (
         <div className="space-y-2">
-          {todos.map((todo) => (
+          {visibleTodos.map((todo) => (
             <div
               key={todo.id}
               className={`flex items-start gap-3 bg-white rounded-lg border border-gray-200 px-3 py-3 group ${
-                todo.is_completed ? 'opacity-60' : ''
+                todo.is_completed || todo.is_archived ? 'opacity-60' : ''
               }`}
             >
               <button
@@ -188,6 +212,14 @@ export default function TodosView() {
                   )}
                 </div>
               </div>
+              {/* Archive / unarchive */}
+              <button
+                onClick={() => updateMutation.mutate({ id: todo.id, data: { is_archived: !todo.is_archived } })}
+                title={todo.is_archived ? 'Unarchive' : 'Archive'}
+                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-purple-400 transition-all flex-shrink-0 mt-0.5"
+              >
+                {todo.is_archived ? <ArchiveX size={14} /> : <Archive size={14} />}
+              </button>
               <button
                 onClick={() => deleteMutation.mutate(todo.id)}
                 className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all flex-shrink-0 mt-0.5"

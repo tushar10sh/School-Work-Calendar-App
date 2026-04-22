@@ -14,6 +14,10 @@ A web app for tracking your child's daily classwork and homework using a calenda
 - **Day panel** — click any date for CW/PW entries with completion checkboxes, bag items with full subject names, events, and tests
 - **Events tab** — school events, holidays, parent meetings; sort by date (soonest/latest); mark events as action-taken with a single click; click any auto-detected event to see the original WhatsApp message, sender, and send time
 - **Calendar → Events navigation** — clicking an Event dot on the calendar switches to the Events tab and highlights the matching events with a 2-second amber flash
+- **Event editing** — pencil icon on hover opens a pre-filled edit modal for any event; title/date changes on auto-detected events are logged to `event_corrections` for LLM fine-tuning
+- **Pending filter** — one-click toggle in the Events tab to show only events where action has not yet been taken
+- **Archive** — archive button on events and todos hides them from the default view without deleting; archived items can be revealed and unarchived via a toggle; syncing never recreates archived events
+- **Weekly / Monthly Summary tab** — stat cards and a detail table showing CW/PW completion rates, events actioned %, and todos completion for the current week or month
 - **Todos** — task list with priority (High/Medium/Low) and due dates
 - **Test Alerts** — upcoming test tracker with live countdown
 - **Re-sync everything** — purge the message cache from Settings to force a full reprocess on the next sync
@@ -180,12 +184,13 @@ School-Work-Calendar-App/
 │       ├── database.py              # Async SQLAlchemy + additive migrations
 │       ├── dependencies.py          # JWT auth dependency
 │       ├── core/security.py         # PIN hashing + JWT utils
-│       ├── models/                  # ORM models (7 tables)
+│       ├── models/                  # ORM models (8 tables)
 │       │   ├── child.py
 │       │   ├── planner.py
 │       │   ├── bag.py
-│       │   ├── event.py             # Includes source_message / sender fields
-│       │   ├── todo.py
+│       │   ├── event.py             # Includes source_message / sender / is_archived fields
+│       │   ├── event_correction.py  # Logs title/date edits for LLM fine-tuning
+│       │   ├── todo.py              # Includes is_archived field
 │       │   ├── test_alert.py
 │       │   └── whatsapp_message.py  # Tracks processed WA message IDs (dedup)
 │       ├── schemas/
@@ -198,6 +203,8 @@ School-Work-Calendar-App/
 │       │   ├── test_alerts.py
 │       │   ├── whatsapp.py
 │       │   ├── sync.py              # /trigger, /stream (SSE), /purge, /status
+│       │   ├── corrections.py       # GET /api/corrections — fine-tuning data export
+│       │   ├── summary.py           # GET /api/summary — weekly/monthly progress
 │       │   └── config_router.py
 │       └── services/
 │           ├── ollama_service.py    # Planner parser + event parser with hallucination guard
@@ -220,9 +227,10 @@ School-Work-Calendar-App/
             ├── DayView/             # Slide-in day detail panel
             ├── MessageParser/       # Paste & parse modal
             ├── WhatsApp/            # QR code, group selector, streaming sync + progress bar
-            ├── Events/              # Events list + SourceModal (original WA message)
-            ├── Todos/
+            ├── Events/              # Events list + SourceModal + EditModal (corrections logged)
+            ├── Todos/               # Todos with archive support
             ├── TestAlerts/
+            ├── Summary/             # Weekly/monthly progress stat cards
             └── Settings/            # WhatsApp panel + re-sync/purge + config viewer
 ```
 
@@ -267,6 +275,8 @@ School-Work-Calendar-App/
 | `POST` | `/api/sync/purge` | Clear message cache + auto-detected events |
 | `GET` | `/api/sync/status` | Last sync time + settings |
 | `GET` | `/api/config` | Subject mappings + Ollama config |
+| `GET` | `/api/corrections` | List all event title/date corrections (fine-tuning data) |
+| `GET` | `/api/summary?start=&end=` | Aggregated CW/PW/events/todos stats for a date range |
 
 ## Ollama on Linux
 

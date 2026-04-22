@@ -14,4 +14,5 @@ class Todo(Base):
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
     is_completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     priority: Mapped[str] = mapped_column(String(10), nullable=False, default="MEDIUM")
+    is_archived: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

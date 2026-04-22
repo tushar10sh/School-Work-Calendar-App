@@ -10,7 +10,7 @@ from sqlalchemy import select
 from app.database import init_db, AsyncSessionLocal
 from app.config import get_settings
 from app.routers import planner, events, todos, test_alerts, config_router
-from app.routers import auth, children, whatsapp, sync
+from app.routers import auth, children, whatsapp, sync, corrections, summary
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -84,6 +84,8 @@ app.include_router(test_alerts.router, prefix="/api/test-alerts", tags=["test-al
 app.include_router(whatsapp.router, prefix="/api/whatsapp", tags=["whatsapp"])
 app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
 app.include_router(config_router.router, prefix="/api/config", tags=["config"])
+app.include_router(corrections.router, prefix="/api/corrections", tags=["corrections"])
+app.include_router(summary.router, prefix="/api/summary", tags=["summary"])
 
 
 @app.get("/health")

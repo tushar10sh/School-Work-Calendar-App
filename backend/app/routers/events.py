@@ -8,6 +8,7 @@ from app.database import get_db
 from app.dependencies import get_current_child
 from app.models.child import Child
 from app.models.event import Event
+from app.models.event_correction import EventCorrection
 from app.schemas.event import EventCreate, EventUpdate, EventResponse
 
 router = APIRouter()
@@ -56,8 +57,29 @@ async def update_event(
     event = result.scalar_one_or_none()
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    for field, value in body.model_dump(exclude_none=True).items():
+
+    original_title = event.title
+    original_date = str(event.event_date)
+
+    updates = body.model_dump(exclude_none=True)
+    for field, value in updates.items():
         setattr(event, field, value)
+
+    title_changed = "title" in updates and updates["title"] != original_title
+    date_changed = "event_date" in updates and str(updates["event_date"]) != original_date
+
+    if title_changed or date_changed:
+        correction = EventCorrection(
+            event_id=event.id,
+            child_id=current_child.id,
+            source_message=event.source_message,
+            original_title=original_title if title_changed else None,
+            corrected_title=updates["title"] if title_changed else None,
+            original_date=original_date if date_changed else None,
+            corrected_date=str(updates["event_date"]) if date_changed else None,
+        )
+        db.add(correction)
+
     await db.commit()
     await db.refresh(event)
     return EventResponse.model_validate(event)

@@ -18,6 +18,7 @@ class TodoUpdate(BaseModel):
     due_date: date | None = None
     is_completed: bool | None = None
     priority: Priority | None = None
+    is_archived: bool | None = None
 
 
 class TodoResponse(BaseModel):
@@ -29,4 +30,5 @@ class TodoResponse(BaseModel):
     due_date: date | None
     is_completed: bool
     priority: str
+    is_archived: bool = False
     created_at: datetime

@@ -4,6 +4,37 @@ All notable changes to School Planner are documented here.
 
 ---
 
+## [Unreleased] — 2026-04-22 (3)
+
+### Added
+
+#### Event edit modal
+- Each event row now has a pencil (Edit) icon that appears on hover; clicking opens a pre-filled edit modal for all fields (title, date, type, description, color)
+- Auto-detected events display a blue hint in the form: "date/title corrections are logged for model improvement"
+
+#### Correction logging for fine-tuning
+- New `event_corrections` DB table records every title or date change made to an event: original value, corrected value, and the source WhatsApp message text
+- `GET /api/corrections` returns all corrections for the authenticated child, ordered by most recent — ready for model fine-tuning pipelines
+
+#### Pending-only filter for Events
+- "All / Pending" toggle button in the Events panel header; when active, hides events where `action_taken = true` so parents can focus on items still needing attention
+
+#### Archive for Events and Todos
+- New `is_archived` boolean field on both `events` and `todos` tables (additive migration)
+- Events panel: hover reveals an Archive icon; clicking archives the event without deleting it; archived events are excluded from the default view
+- Todos view: same Archive icon on hover; archived todos are excluded from the active list
+- Both panels show a purple "Archived (N)" toggle button when archived items exist; clicking shows/hides the archived set with an unarchive option
+- Archived items preserve sync history — re-syncing never recreates archived events
+
+#### Weekly / monthly progress summary
+- New **Summary** tab (between Test Alerts and Settings) showing child progress over the selected period
+- Period toggle: **This Week** (Mon–Sun) / **This Month**
+- Four stat cards with percentage rings and progress bars: Classwork completion, Homework completion, Events actioned, Todos completed
+- Detail table below cards with raw counts (done / total) for each category
+- Powered by new `GET /api/summary?start=&end=` endpoint that aggregates planner, events, and todos data in a single query
+
+---
+
 ## [Unreleased] — 2026-04-22 (2)
 
 ### Added

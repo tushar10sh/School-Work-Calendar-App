@@ -88,3 +88,11 @@ export const syncApi = {
   purge: () => api.post('/sync/purge').then((r) => r.data),
   streamUrl: () => `/api/sync/stream?token=${localStorage.getItem('token') ?? ''}`,
 }
+
+export const correctionsApi = {
+  list: () => api.get('/corrections').then((r) => r.data),
+}
+
+export const summaryApi = {
+  get: (start, end) => api.get('/summary', { params: { start, end } }).then((r) => r.data),
+}

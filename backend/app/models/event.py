@@ -15,6 +15,7 @@ class Event(Base):
     event_type: Mapped[str] = mapped_column(String(30), nullable=False, default="OTHER")
     color: Mapped[str] = mapped_column(String(20), nullable=False, default="#10b981")
     action_taken: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_archived: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     source_message: Mapped[str | None] = mapped_column(String(5000), nullable=True)
     source_timestamp: Mapped[int | None] = mapped_column(Integer, nullable=True)
     source_sender: Mapped[str | None] = mapped_column(String(100), nullable=True)

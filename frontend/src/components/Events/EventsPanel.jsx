@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, X, MessageSquare, CheckCircle2, Circle, ArrowUpDown } from 'lucide-react'
+import {
+  Plus, Trash2, X, MessageSquare, CheckCircle2, Circle, ArrowUpDown,
+  Edit2, Archive, ArchiveX, Filter,
+} from 'lucide-react'
 import { format } from 'date-fns'
 import { eventsApi } from '../../api'
 
@@ -77,12 +80,125 @@ function SourceModal({ event, onClose }) {
   )
 }
 
+function EventFormModal({ event, onClose, onSave, isPending }) {
+  const [form, setForm] = useState({
+    title: event.title,
+    description: event.description || '',
+    event_date: event.event_date,
+    event_type: event.event_type,
+    color: event.color,
+  })
+
+  function handleSubmit(e) {
+    e.preventDefault()
+    if (!form.title.trim()) return
+    onSave(form)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-5 space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-gray-800">Edit Event</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="text-xs text-gray-500 mb-1 block">Title *</label>
+              <input
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Date *</label>
+              <input
+                type="date"
+                value={form.event_date}
+                onChange={(e) => setForm({ ...form, event_date: e.target.value })}
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Type</label>
+              <select
+                value={form.event_type}
+                onChange={(e) => setForm({ ...form, event_type: e.target.value })}
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                {EVENT_TYPES.map((t) => (
+                  <option key={t} value={t}>{TYPE_LABELS[t]}</option>
+                ))}
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs text-gray-500 mb-1 block">Description</label>
+              <input
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                placeholder="Optional description"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Color</label>
+              <div className="flex gap-2 mt-1">
+                {COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setForm({ ...form, color: c })}
+                    className={`w-6 h-6 rounded-full transition-transform ${form.color === c ? 'scale-125 ring-2 ring-offset-1 ring-gray-400' : ''}`}
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {event.source_message && (
+            <p className="text-xs text-blue-500 bg-blue-50 rounded px-2 py-1">
+              This event was auto-detected — date/title corrections are logged for model improvement.
+            </p>
+          )}
+
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={onClose} className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isPending}
+              className="bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition-colors"
+            >
+              Save
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 export default function EventsPanel({ highlightDate, onHighlightClear }) {
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
   const [selectedEvent, setSelectedEvent] = useState(null)
+  const [editingEvent, setEditingEvent] = useState(null)
   const [sortAsc, setSortAsc] = useState(true)
+  const [pendingOnly, setPendingOnly] = useState(false)
+  const [showArchived, setShowArchived] = useState(false)
   const [highlightedIds, setHighlightedIds] = useState(new Set())
   const rowRefs = useRef({})
 
@@ -101,6 +217,15 @@ export default function EventsPanel({ highlightDate, onHighlightClear }) {
     },
   })
 
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }) => eventsApi.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] })
+      queryClient.invalidateQueries({ queryKey: ['planner-range'] })
+      setEditingEvent(null)
+    },
+  })
+
   const deleteMutation = useMutation({
     mutationFn: (id) => eventsApi.delete(id),
     onSuccess: () => {
@@ -115,6 +240,11 @@ export default function EventsPanel({ highlightDate, onHighlightClear }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['events'] }),
   })
 
+  const archiveMutation = useMutation({
+    mutationFn: ({ id, is_archived }) => eventsApi.update(id, { is_archived }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['events'] }),
+  })
+
   // Highlight rows when navigated from calendar
   useEffect(() => {
     if (!highlightDate || !events.length) return
@@ -125,13 +255,10 @@ export default function EventsPanel({ highlightDate, onHighlightClear }) {
     const ids = new Set(matching.map((e) => e.id))
     setHighlightedIds(ids)
 
-    // Scroll the first matching row into view
-    const firstId = matching[0].id
     setTimeout(() => {
-      rowRefs.current[firstId]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      rowRefs.current[matching[0].id]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }, 50)
 
-    // Clear highlight after 2 s
     const timer = setTimeout(() => {
       setHighlightedIds(new Set())
       onHighlightClear?.()
@@ -147,13 +274,19 @@ export default function EventsPanel({ highlightDate, onHighlightClear }) {
 
   const today = format(new Date(), 'yyyy-MM-dd')
 
-  const sorted = [...events].sort((a, b) => {
-    const cmp = a.event_date.localeCompare(b.event_date)
-    return sortAsc ? cmp : -cmp
-  })
+  // Apply filters before split
+  const filtered = [...events]
+    .filter((e) => (showArchived ? e.is_archived : !e.is_archived))
+    .filter((e) => (pendingOnly ? !e.action_taken : true))
+    .sort((a, b) => {
+      const cmp = a.event_date.localeCompare(b.event_date)
+      return sortAsc ? cmp : -cmp
+    })
 
-  const upcoming = sorted.filter((e) => e.event_date >= today)
-  const past = sorted.filter((e) => e.event_date < today)
+  const upcoming = filtered.filter((e) => e.event_date >= today)
+  const past = filtered.filter((e) => e.event_date < today)
+
+  const archivedCount = events.filter((e) => e.is_archived).length
 
   function handleSubmit(e) {
     e.preventDefault()
@@ -165,7 +298,20 @@ export default function EventsPanel({ highlightDate, onHighlightClear }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-base font-semibold text-gray-800">Events</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          {/* Pending filter */}
+          <button
+            onClick={() => setPendingOnly((v) => !v)}
+            title={pendingOnly ? 'Showing: Pending only' : 'Showing: All events'}
+            className={`flex items-center gap-1.5 text-xs border px-2.5 py-1.5 rounded-lg transition-colors ${
+              pendingOnly
+                ? 'bg-amber-50 border-amber-300 text-amber-700'
+                : 'text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700 bg-white'
+            }`}
+          >
+            <Filter size={12} />
+            {pendingOnly ? 'Pending only' : 'All'}
+          </button>
           {/* Sort toggle */}
           <button
             onClick={() => setSortAsc((v) => !v)}
@@ -175,6 +321,20 @@ export default function EventsPanel({ highlightDate, onHighlightClear }) {
             <ArrowUpDown size={12} />
             {sortAsc ? 'Soonest first' : 'Latest first'}
           </button>
+          {/* Archive toggle */}
+          {archivedCount > 0 && (
+            <button
+              onClick={() => setShowArchived((v) => !v)}
+              className={`flex items-center gap-1.5 text-xs border px-2.5 py-1.5 rounded-lg transition-colors ${
+                showArchived
+                  ? 'bg-purple-50 border-purple-300 text-purple-700'
+                  : 'text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700 bg-white'
+              }`}
+            >
+              {showArchived ? <ArchiveX size={12} /> : <Archive size={12} />}
+              {showArchived ? 'Hide archived' : `Archived (${archivedCount})`}
+            </button>
+          )}
           <button
             onClick={() => setShowForm(!showForm)}
             className="flex items-center gap-1.5 bg-green-500 hover:bg-green-600 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
@@ -261,23 +421,29 @@ export default function EventsPanel({ highlightDate, onHighlightClear }) {
       )}
 
       <EventList
-        title="Upcoming"
+        title={showArchived ? 'Archived — Upcoming' : 'Upcoming'}
         events={upcoming}
         onSelect={setSelectedEvent}
+        onEdit={setEditingEvent}
         onDelete={(id) => deleteMutation.mutate(id)}
         onToggleAction={(ev) => actionMutation.mutate({ id: ev.id, action_taken: !ev.action_taken })}
+        onToggleArchive={(ev) => archiveMutation.mutate({ id: ev.id, is_archived: !ev.is_archived })}
         highlightedIds={highlightedIds}
         setRowRef={setRowRef}
+        showArchived={showArchived}
       />
       {past.length > 0 && (
         <EventList
-          title="Past"
+          title={showArchived ? 'Archived — Past' : 'Past'}
           events={past}
           onSelect={setSelectedEvent}
+          onEdit={setEditingEvent}
           onDelete={(id) => deleteMutation.mutate(id)}
           onToggleAction={(ev) => actionMutation.mutate({ id: ev.id, action_taken: !ev.action_taken })}
+          onToggleArchive={(ev) => archiveMutation.mutate({ id: ev.id, is_archived: !ev.is_archived })}
           highlightedIds={highlightedIds}
           setRowRef={setRowRef}
+          showArchived={showArchived}
           muted
         />
       )}
@@ -285,11 +451,19 @@ export default function EventsPanel({ highlightDate, onHighlightClear }) {
       {selectedEvent && (
         <SourceModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
       )}
+      {editingEvent && (
+        <EventFormModal
+          event={editingEvent}
+          onClose={() => setEditingEvent(null)}
+          onSave={(data) => updateMutation.mutate({ id: editingEvent.id, data })}
+          isPending={updateMutation.isPending}
+        />
+      )}
     </div>
   )
 }
 
-function EventList({ title, events, onSelect, onDelete, onToggleAction, highlightedIds, setRowRef, muted }) {
+function EventList({ title, events, onSelect, onEdit, onDelete, onToggleAction, onToggleArchive, highlightedIds, setRowRef, showArchived, muted }) {
   if (!events.length) return null
   return (
     <div>
@@ -322,6 +496,22 @@ function EventList({ title, events, onSelect, onDelete, onToggleAction, highligh
               {ev.source_message && (
                 <MessageSquare size={13} className="text-gray-300 flex-shrink-0" />
               )}
+              {/* Edit */}
+              <button
+                onClick={(e) => { e.stopPropagation(); onEdit(ev) }}
+                title="Edit event"
+                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-blue-400 transition-all flex-shrink-0"
+              >
+                <Edit2 size={13} />
+              </button>
+              {/* Archive / unarchive */}
+              <button
+                onClick={(e) => { e.stopPropagation(); onToggleArchive(ev) }}
+                title={ev.is_archived ? 'Unarchive' : 'Archive'}
+                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-purple-400 transition-all flex-shrink-0"
+              >
+                {ev.is_archived ? <ArchiveX size={13} /> : <Archive size={13} />}
+              </button>
               {/* Action taken toggle */}
               <button
                 onClick={(e) => { e.stopPropagation(); onToggleAction(ev) }}
